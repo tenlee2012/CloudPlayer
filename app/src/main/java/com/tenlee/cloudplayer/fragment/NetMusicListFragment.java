@@ -1,109 +1,201 @@
 package com.tenlee.cloudplayer.fragment;
 
 import android.content.Context;
-import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
+import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.ListView;
+import android.widget.Toast;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import com.lidroid.xutils.HttpUtils;
+import com.lidroid.xutils.exception.HttpException;
+import com.lidroid.xutils.http.ResponseInfo;
+import com.lidroid.xutils.http.callback.RequestCallBack;
+import com.lidroid.xutils.http.client.HttpRequest;
 import com.tenlee.cloudplayer.R;
+import com.tenlee.cloudplayer.activity.MainActivity;
+import com.tenlee.cloudplayer.adapter.NetMusicAdapter;
+import com.tenlee.cloudplayer.entity.Song;
+import com.tenlee.cloudplayer.utils.AppUtils;
+import com.tenlee.cloudplayer.utils.NetMusicUtils;
 
-/**
- * A simple {@link Fragment} subclass.
- * Activities that contain this fragment must implement the
- * {@link NetMusicListFragment.OnFragmentInteractionListener} interface
- * to handle interaction events.
- * Use the {@link NetMusicListFragment#newInstance} factory method to
- * create an instance of this fragment.
- */
-public class NetMusicListFragment extends Fragment {
-    // TODO: Rename parameter arguments, choose names that match
-    // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-    private static final String ARG_PARAM1 = "param1";
-    private static final String ARG_PARAM2 = "param2";
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
 
-    // TODO: Rename and change types of parameters
-    private String mParam1;
-    private String mParam2;
+public class NetMusicListFragment extends Fragment implements AdapterView.OnItemClickListener,
+                                                    View.OnClickListener{
 
-    private OnFragmentInteractionListener mListener;
+    private MainActivity mainActivity;
+    private ListView listView_net_music;
+    private LinearLayout load_layout;
+    private LinearLayout ll_search_btn_container;
+    private LinearLayout ll_search_container;
+    private ImageButton search_ImageButton;
+    private EditText et_search_content;
 
-    public NetMusicListFragment() {
-        // Required empty public constructor
-    }
+    private ArrayList<Song> searchResults = new ArrayList<Song>();
+    private NetMusicAdapter netMusicAdapter;
+    private int page = 1;//搜索音乐的页码
 
-    /**
-     * Use this factory method to create a new instance of
-     * this fragment using the provided parameters.
-     *
-     * @param param1 Parameter 1.
-     * @param param2 Parameter 2.
-     * @return A new instance of fragment NetMusicListFragment.
-     */
-    // TODO: Rename and change types and number of parameters
-    public static NetMusicListFragment newInstance(String param1, String param2) {
+    public NetMusicListFragment() { }
+
+    public static NetMusicListFragment newInstance() {
         NetMusicListFragment fragment = new NetMusicListFragment();
-        Bundle args = new Bundle();
-        args.putString(ARG_PARAM1, param1);
-        args.putString(ARG_PARAM2, param2);
-        fragment.setArguments(args);
         return fragment;
     }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (getArguments() != null) {
-            mParam1 = getArguments().getString(ARG_PARAM1);
-            mParam2 = getArguments().getString(ARG_PARAM2);
-        }
     }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_net_music_list, container, false);
+        View view =  inflater.inflate(R.layout.fragment_net_music_list, container, false);
+
+        listView_net_music = (ListView) view.findViewById(R.id.listView_net_music);
+        load_layout = (LinearLayout) view.findViewById(R.id.load_layout);
+        ll_search_btn_container = (LinearLayout) view.findViewById(R.id.ll_search_btn_container);
+        ll_search_container = (LinearLayout) view.findViewById(R.id.ll_search_container);
+        search_ImageButton = (ImageButton) view.findViewById(R.id.ib_search_btn);
+        et_search_content = (EditText) view.findViewById(R.id.et_search_content);
+
+        listView_net_music.setOnItemClickListener(this);
+        listView_net_music.setVisibility(View.VISIBLE);
+        ll_search_btn_container.setOnClickListener(this);
+        search_ImageButton.setOnClickListener(this);
+        loadNetMusic();
+        return view;
     }
 
-    // TODO: Rename method, update argument and hook method into UI event
-    public void onButtonPressed(Uri uri) {
-        if (mListener != null) {
-            mListener.onFragmentInteraction(uri);
-        }
+    private void loadNetMusic() {
+        new LoadNetDataTask().execute(NetMusicUtils.BAIDU_MUSIC_DAYHOT_URL);
     }
+
 
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
-        if (context instanceof OnFragmentInteractionListener) {
-            mListener = (OnFragmentInteractionListener) context;
-        } else {
-            throw new RuntimeException(context.toString()
-                    + " must implement OnFragmentInteractionListener");
+        mainActivity = (MainActivity) getActivity();
+    }
+
+
+
+    @Override
+    public void onClick(View v) {
+        switch (v.getId()) {
+            case R.id.ll_search_btn_container:
+                ll_search_btn_container.setVisibility(View.GONE);
+                ll_search_container.setVisibility(View.VISIBLE);
+                break;
+            case R.id.ib_search_btn:
+                searchMusic();
+                break;
         }
     }
 
-    @Override
-    public void onDetach() {
-        super.onDetach();
-        mListener = null;
+    private void searchMusic() {
+        AppUtils.hideInputMethod(et_search_content);
+
+
+        ll_search_btn_container.setVisibility(View.VISIBLE);
+        ll_search_container.setVisibility(View.GONE);
+        String key = et_search_content.getText().toString();
+        if (TextUtils.isEmpty(key)) {
+            Toast.makeText(mainActivity, "请输入关键字", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        load_layout.setVisibility(View.VISIBLE);
+
+        HttpUtils http = new HttpUtils();
+        http.send(HttpRequest.HttpMethod.GET,
+                "http://musicuu.com/search/song?key=" + key +"&type=bd",
+                new RequestCallBack<String>() {
+                    @Override
+                    public void onLoading(long total, long current, boolean isUploading) {
+
+                    }
+
+                    @Override
+                    public void onSuccess(ResponseInfo<String> responseInfo) {
+                        searchResults = gsonReader(responseInfo.result);
+                        netMusicAdapter = new NetMusicAdapter(mainActivity, searchResults);
+                        listView_net_music.setAdapter(netMusicAdapter);
+
+                        load_layout.setVisibility(View.GONE);
+                        listView_net_music.setVisibility(View.VISIBLE);
+                    }
+
+                    @Override
+                    public void onStart() {
+                    }
+
+                    @Override
+                    public void onFailure(HttpException error, String msg) {
+                    }
+                });
+
     }
 
-    /**
-     * This interface must be implemented by activities that contain this
-     * fragment to allow an interaction in this fragment to be communicated
-     * to the activity and potentially other fragments contained in that
-     * activity.
-     * <p/>
-     * See the Android Training lesson <a href=
-     * "http://developer.android.com/training/basics/fragments/communicating.html"
-     * >Communicating with Other Fragments</a> for more information.
-     */
-    public interface OnFragmentInteractionListener {
-        // TODO: Update argument type and name
-        void onFragmentInteraction(Uri uri);
+    @Override
+    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
+    }
+
+    class LoadNetDataTask extends AsyncTask<String, Integer, Integer> {
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            load_layout.setVisibility(View.VISIBLE);
+            listView_net_music.setVisibility(View.GONE);
+            searchResults.clear();
+        }
+
+        @Override
+        protected Integer doInBackground(String... params) {
+            searchResults = NetMusicUtils.getDayHotMusic(params[0]);
+            return 1;
+        }
+
+        @Override
+        protected void onPostExecute(Integer integer) {
+            super.onPostExecute(integer);
+            if(integer == 1) {
+                netMusicAdapter = new NetMusicAdapter(mainActivity, searchResults);
+                listView_net_music.setAdapter(netMusicAdapter);
+            }
+            load_layout.setVisibility(View.GONE);
+            listView_net_music.setVisibility(View.VISIBLE);
+        }
+    }
+
+    public ArrayList<Song> gsonReader(String json) {
+        Gson gson = new Gson();
+        InputStream in = new ByteArrayInputStream(json.getBytes());
+        Reader r = new InputStreamReader(in);
+        Type type = new TypeToken<ArrayList<Song>>(){}.getType();
+        ArrayList<Song> list = gson.fromJson(r, type);
+//        System.out.println("--------------------------");
+//        for (int i = 0; i < list.size(); i++) {
+//            System.out.println(list.get(i));
+//        }
+        return list;
     }
 }

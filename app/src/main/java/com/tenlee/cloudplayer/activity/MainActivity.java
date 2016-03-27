@@ -23,6 +23,7 @@ import com.astuetz.viewpager.extensions.sample.SuperAwesomeCardFragment;
 import com.tenlee.cloudplayer.MusicApplication;
 import com.tenlee.cloudplayer.fragment.MyMusicListFragment;
 import com.tenlee.cloudplayer.R;
+import com.tenlee.cloudplayer.fragment.NetMusicListFragment;
 import com.tenlee.cloudplayer.service.PlayService;
 import com.tenlee.cloudplayer.utils.Constant;
 
@@ -34,6 +35,7 @@ public class MainActivity extends BaseActivity {
     private ViewPager pager;
     private MyPagerAdapter adapter;
     private MyMusicListFragment myMusicListFragment;
+    private NetMusicListFragment netMusicListFragment;
 
     private Drawable oldBackground = null;
     private int currentColor = 0xFF3F9FE0;
@@ -160,7 +162,7 @@ public class MainActivity extends BaseActivity {
     public void change(int position) {
         //切换状态播放位置
         if (pager.getCurrentItem() == 0) {
-            myMusicListFragment.loadData();
+            myMusicListFragment.loadData(); //此时加载音乐
             myMusicListFragment.changeUIStatusOnPlay(position);
         } else if (pager.getCurrentItem() == 1) {
 
@@ -195,7 +197,10 @@ public class MainActivity extends BaseActivity {
                 }
                 return myMusicListFragment;
             } else if (position == 1 ) { //网络音乐
-
+                if(netMusicListFragment == null) {
+                    netMusicListFragment =  NetMusicListFragment.newInstance();
+                }
+                return netMusicListFragment;
             }
 //            return MyMusicListFragment.newInstance(position);
             return SuperAwesomeCardFragment.newInstance(position);
