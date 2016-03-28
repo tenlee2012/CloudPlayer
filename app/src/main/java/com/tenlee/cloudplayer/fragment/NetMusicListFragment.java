@@ -135,8 +135,11 @@ public class NetMusicListFragment extends Fragment implements AdapterView.OnItem
                     @Override
                     public void onSuccess(ResponseInfo<String> responseInfo) {
                         searchResults = gsonReader(responseInfo.result);
-                        netMusicAdapter = new NetMusicAdapter(mainActivity, searchResults);
-                        listView_net_music.setAdapter(netMusicAdapter);
+
+                        ArrayList<Song> sr = netMusicAdapter.getSongList();
+                        sr.clear();
+                        sr.addAll(searchResults);
+                        netMusicAdapter.notifyDataSetChanged();
 
                         load_layout.setVisibility(View.GONE);
                         listView_net_music.setVisibility(View.VISIBLE);
@@ -153,9 +156,22 @@ public class NetMusicListFragment extends Fragment implements AdapterView.OnItem
 
     }
 
+    /**
+     * 列表项的单击事件
+     * @param parent
+     * @param view
+     * @param position
+     * @param id
+     */
     @Override
     public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+        if(position >= netMusicAdapter.getSongList().size() || position < 0) return;
+        showDownloadDialog(position);
+    }
 
+    private void showDownloadDialog(final int position) {
+        DownloadDialogFragment downloadDialogFragment = DownloadDialogFragment.newInstance(
+                netMusicAdapter.getSongList().get(position));
     }
 
     class LoadNetDataTask extends AsyncTask<String, Integer, Integer> {

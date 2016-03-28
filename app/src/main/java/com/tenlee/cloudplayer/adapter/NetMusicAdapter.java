@@ -30,6 +30,14 @@ public class NetMusicAdapter extends BaseAdapter implements Scrollable {
         this.songList = songList;
     }
 
+    public ArrayList<Song> getSongList() {
+        return songList;
+    }
+
+    public void setSongList(ArrayList<Song> songList) {
+        this.songList = songList;
+    }
+
     @Override
     public int getCount() {
         return songList.size();
